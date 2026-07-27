@@ -1,0 +1,32 @@
+{
+  "shopName": "Demo Roastery",
+  "vendorPublicId": "0xVENDOR_PUBLIC_ID_PLACEHOLDER",
+  "vendorAddress": "MxVENDOR_ADDRESS_PLACEHOLDER",
+  "currency": "Minima",
+  "tokenid": "0x00",
+  "shipping": [
+    { "id": "uk", "label": "UK shipping", "fee": "0" },
+    { "id": "intl", "label": "International", "fee": "0" },
+    { "id": "digital", "label": "Digital / collect", "fee": "0" }
+  ],
+  "products": [
+    {
+      "id": "p0",
+      "name": "House Blend (250g)",
+      "description": "Smooth everyday espresso roast. Whole bean or ground.",
+      "mode": "units",
+      "price": "5",
+      "maxUnits": 10,
+      "image": ""
+    },
+    {
+      "id": "p1",
+      "name": "Single Origin Ethiopia",
+      "description": "Bright, floral, washed Yirgacheffe. Limited batch.",
+      "mode": "units",
+      "price": "8",
+      "maxUnits": 4,
+      "image": ""
+    }
+  ]
+}
