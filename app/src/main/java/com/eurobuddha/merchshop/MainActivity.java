@@ -523,6 +523,13 @@ public class MainActivity extends AppCompatActivity {
         price.setText(p.price + " " + catalog.currency); price.setTextColor(Design.ACCENT); price.setTextSize(20f);
         price.setTypeface(null, Typeface.BOLD); price.setPadding(0, dp(14), 0, dp(8)); body.addView(price);
 
+        if (p.nftTokenId != null && !p.nftTokenId.isEmpty()) {
+            TextView nft = new TextView(this);
+            nft.setText("NFT · delivered on-chain after payment");
+            nft.setTextColor(Design.DIM); nft.setTextSize(12f); nft.setPadding(0, 0, 0, dp(8));
+            body.addView(nft);
+        }
+
         if (!p.description.isEmpty()) {
             TextView d = new TextView(this); d.setText(p.description); d.setTextColor(Design.TEXT); d.setTextSize(15f);
             d.setLineSpacing(dp(3), 1f); body.addView(d);
@@ -644,6 +651,8 @@ public class MainActivity extends AppCompatActivity {
                 JSONObject it = new JSONObject();
                 it.put("product", p.name); it.put("size", ""); it.put("quantity", q);
                 it.put("unitPrice", p.price); it.put("lineTotal", line.toPlainString());
+                // NFT listings carry the tokenid so the vendor's Inbox can send the NFT on-chain.
+                if (p.nftTokenId != null && !p.nftTokenId.isEmpty()) it.put("nftTokenId", p.nftTokenId);
                 items.put(it);
                 if (summary.length() > 0) summary.append(", ");
                 summary.append(p.name).append(" x").append(q);

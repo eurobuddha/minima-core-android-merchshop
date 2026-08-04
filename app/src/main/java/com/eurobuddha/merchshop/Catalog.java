@@ -17,6 +17,8 @@ public final class Catalog {
     public static class Product {
         public String id, name, description = "", mode = "units", price = "0", image = "";
         public int maxUnits = 10;
+        /** Tokenid of the NFT being sold (set by miniMerch NFT Studio; empty for normal products). */
+        public String nftTokenId = "";
     }
     public static class Shipping { public String id = "", label = "", fee = "0"; }
 
@@ -45,6 +47,7 @@ public final class Catalog {
                 x.description = p.optString("description", ""); x.mode = p.optString("mode", "units");
                 x.price = p.optString("price", "0"); x.maxUnits = p.optInt("maxUnits", 10);
                 x.image = p.optString("image", "");
+                x.nftTokenId = p.optString("nftTokenId", "");
                 c.products.add(x);
             }
         } catch (Exception ignored) { /* keep defaults */ }

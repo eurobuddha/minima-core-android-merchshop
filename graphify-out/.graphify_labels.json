@@ -1,0 +1,20 @@
+{
+  "0": "MainActivity",
+  "1": "CommsScanner",
+  "2": "CommsIdentity",
+  "3": "MerchDb",
+  "4": ".buildOrderDetail",
+  "5": "NodeApi",
+  "6": "Catalog",
+  "7": ".onBindViewHolder",
+  "8": ".pill",
+  "9": "Util",
+  "10": "Images",
+  "11": ".placeOrder",
+  "12": "QrUtil",
+  "13": "Sodium",
+  "14": "gradlew",
+  "15": "app/build.gradle",
+  "16": "settings.gradle",
+  "17": "miniMerch Shop (native Android)"
+}
