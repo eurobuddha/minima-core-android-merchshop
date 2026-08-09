@@ -416,7 +416,7 @@ public class MainActivity extends AppCompatActivity {
             final NftGridAdapter ad = new NftGridAdapter();
             androidx.recyclerview.widget.GridLayoutManager glm = new androidx.recyclerview.widget.GridLayoutManager(this, 2);
             glm.setSpanSizeLookup(new androidx.recyclerview.widget.GridLayoutManager.SpanSizeLookup() {
-                @Override public int getSpanSize(int pos) { return ad.rows.get(pos) instanceof String ? 2 : 1; }
+                @Override public int getSpanSize(int pos) { return ad.rows.get(pos) instanceof ColHeader ? 2 : 1; }
             });
             rv.setLayoutManager(glm);
             rv.setPadding(dp(10), dp(4), dp(10), dp(10));
@@ -432,38 +432,54 @@ public class MainActivity extends AppCompatActivity {
         return col;
     }
 
+    /** A full-width collection section header in the NFT grid — carries the tokenid so the
+     *  standard top-side token icon renders beside the name (the cards carry the stamped art). */
+    private static final class ColHeader {
+        final String tokenid, label;
+        ColHeader(String tokenid, String label) { this.tokenid = tokenid; this.label = label; }
+    }
+
     /** 2-col art-first grid for NFT shops: square art, name, edition chip, price. Tap → item page.
-     *  StateNFT pieces group under full-width collection headers (rows: Product | String header). */
+     *  StateNFT bundles + pieces group under full-width collection headers with the token icon. */
     private class NftGridAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         final List<Object> rows = new ArrayList<>();
 
         NftGridAdapter() {
-            // plain products first, then each collection: header + its pieces in edition order
-            for (Catalog.Product p : catalog.products) if (!p.isStatePiece()) rows.add(p);
+            // plain products first, then each collection: header + bundle + pieces in edition order
+            for (Catalog.Product p : catalog.products) if (!p.isStatePiece() && !p.isBundle()) rows.add(p);
             LinkedHashMap<String, List<Catalog.Product>> cols = new LinkedHashMap<>();
             for (Catalog.Product p : catalog.products) {
-                if (!p.isStatePiece()) continue;
+                if (!p.isStatePiece() && !p.isBundle()) continue;
                 List<Catalog.Product> list = cols.get(p.nftTokenId);
                 if (list == null) { list = new ArrayList<>(); cols.put(p.nftTokenId, list); }
                 list.add(p);
             }
-            for (List<Catalog.Product> pieces : cols.values()) {
-                pieces.sort((a, b) -> Integer.compare(a.nftStateIdx, b.nftStateIdx));
-                String name = pieces.get(0).nftCollection.isEmpty() ? "Collection" : pieces.get(0).nftCollection;
-                rows.add(name.toUpperCase() + " · " + pieces.size() + (pieces.size() == 1 ? " PIECE" : " PIECES"));
-                rows.addAll(pieces);
+            for (Map.Entry<String, List<Catalog.Product>> e : cols.entrySet()) {
+                List<Catalog.Product> items = e.getValue();
+                items.sort((a, b) -> {
+                    if (a.isBundle() != b.isBundle()) return a.isBundle() ? -1 : 1;   // bundle first
+                    return Integer.compare(a.nftStateIdx, b.nftStateIdx);
+                });
+                Catalog.Product first = items.get(0);
+                String name = !first.nftCollection.isEmpty() ? first.nftCollection : "Collection";
+                Catalog.CollectionInfo ci = catalog.nftCollections.get(e.getKey());
+                if (ci != null && !ci.name.isEmpty()) name = ci.name;
+                int pieceCount = 0;
+                for (Catalog.Product p : items) pieceCount += p.isBundle() ? Math.max(1, p.nftPieces) : 1;
+                rows.add(new ColHeader(e.getKey(), name.toUpperCase() + " · " + pieceCount + (pieceCount == 1 ? " PIECE" : " PIECES")));
+                rows.addAll(items);
             }
         }
 
-        @Override public int getItemViewType(int pos) { return rows.get(pos) instanceof String ? 1 : 0; }
+        @Override public int getItemViewType(int pos) { return rows.get(pos) instanceof ColHeader ? 1 : 0; }
 
         @NonNull @Override public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
             if (type == 1) {
-                TextView t = new TextView(MainActivity.this);
-                t.setTextColor(Design.DIM2); t.setTextSize(11f); t.setTypeface(null, Typeface.BOLD);
-                t.setPadding(dp(10), dp(16), dp(10), dp(4));
-                t.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                return new RecyclerView.ViewHolder(t) {};
+                LinearLayout row = new LinearLayout(MainActivity.this);
+                row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(dp(10), dp(16), dp(10), dp(4));
+                row.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                return new RecyclerView.ViewHolder(row) {};
             }
             LinearLayout card = new LinearLayout(MainActivity.this);
             card.setOrientation(LinearLayout.VERTICAL);
@@ -471,7 +487,35 @@ public class MainActivity extends AppCompatActivity {
             return new RecyclerView.ViewHolder(card) {};
         }
         @Override public void onBindViewHolder(@NonNull RecyclerView.ViewHolder h, int pos) {
-            if (rows.get(pos) instanceof String) { ((TextView) h.itemView).setText((String) rows.get(pos)); return; }
+            if (rows.get(pos) instanceof ColHeader) {
+                final ColHeader hd = (ColHeader) rows.get(pos);
+                LinearLayout row = (LinearLayout) h.itemView; row.removeAllViews();
+                Catalog.CollectionInfo ci = catalog.nftCollections.get(hd.tokenid);
+                if (ci != null && !ci.icon.isEmpty()) {
+                    final ImageView ic = new ImageView(MainActivity.this);
+                    ic.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    ic.setBackground(Design.roundBg(MainActivity.this, Design.SURFACE2, 7));
+                    ic.setClipToOutline(true);
+                    LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(dp(26), dp(26));
+                    ilp.rightMargin = dp(8); ic.setLayoutParams(ilp);
+                    row.addView(ic);
+                    Bitmap cb = imgCache.get("colicon:" + hd.tokenid);
+                    if (cb != null) ic.setImageBitmap(cb);
+                    else {
+                        ic.setTag(hd.tokenid);
+                        final String iconB64 = ci.icon;
+                        io.execute(() -> {
+                            Bitmap b = decodeSampled(iconB64, dp(52));
+                            if (b != null) { imgCache.put("colicon:" + hd.tokenid, b); ui.post(() -> { if (hd.tokenid.equals(ic.getTag())) ic.setImageBitmap(b); }); }
+                        });
+                    }
+                }
+                TextView t = new TextView(MainActivity.this);
+                t.setText(hd.label);
+                t.setTextColor(Design.DIM2); t.setTextSize(11f); t.setTypeface(null, Typeface.BOLD);
+                row.addView(t);
+                return;
+            }
             final Catalog.Product p = (Catalog.Product) rows.get(pos);
             LinearLayout card = (LinearLayout) h.itemView; card.removeAllViews();
             LinearLayout inner = new LinearLayout(MainActivity.this);
@@ -524,9 +568,10 @@ public class MainActivity extends AppCompatActivity {
         @Override public int getItemCount() { return rows.size(); }
     }
 
-    /** Edition scarcity chip: "◈ #idx / N" for a StateNFT piece, "◈ 1 of 1" for a unique token,
-     *  "◈ ×N eds" for the editions on sale. */
+    /** Edition scarcity chip: "◈ complete · N pieces" for a whole collection, "◈ #idx / N" for a
+     *  StateNFT piece, "◈ 1 of 1" for a unique token, "◈ ×N eds" for the editions on sale. */
     private String editionChip(Catalog.Product p) {
+        if (p.isBundle()) return p.nftPieces > 0 ? "◈ complete · " + p.nftPieces + " pieces" : "◈ complete collection";
         if (p.isStatePiece()) return p.nftSupply > 0 ? "◈ #" + p.nftStateIdx + " / " + p.nftSupply : "◈ #" + p.nftStateIdx;
         if (p.nftSupply == 1 || (p.nftSupply == 0 && p.maxUnits == 1)) return "◈ 1 of 1";
         return "◈ ×" + p.maxUnits + " eds";
@@ -680,7 +725,14 @@ public class MainActivity extends AppCompatActivity {
         // token provenance (NFT items)
         if (p.isNft()) {
             body.addView(sectionLabel("Token"));
-            if (p.isStatePiece()) {
+            if (p.isBundle()) {
+                body.addView(kv("Contents", "Complete collection — " + (p.nftPieces > 0 ? p.nftPieces + " pieces" : "every piece the seller holds")));
+                if (!p.nftCollection.isEmpty()) body.addView(kv("Collection", p.nftCollection));
+                TextView bd = new TextView(this);
+                bd.setText("Each piece arrives in your wallet as its own on-chain transfer — they land one by one after payment.");
+                bd.setTextColor(Design.DIM); bd.setTextSize(12.5f); bd.setPadding(0, dp(4), 0, dp(4)); bd.setLineSpacing(dp(2), 1f);
+                body.addView(bd);
+            } else if (p.isStatePiece()) {
                 body.addView(kv("Edition", "#" + p.nftStateIdx + (p.nftSupply > 0 ? " of " + p.nftSupply : "")));
                 if (!p.nftCollection.isEmpty()) body.addView(kv("Collection", p.nftCollection));
             }
@@ -953,6 +1005,8 @@ public class MainActivity extends AppCompatActivity {
                 if (p.nftTokenId != null && !p.nftTokenId.isEmpty()) it.put("nftTokenId", p.nftTokenId);
                 // StateNFT piece: the edition index identifies the exact coin the Inbox must transfer
                 if (p.nftStateIdx > 0) it.put("nftStateIdx", p.nftStateIdx);
+                // Complete collection: the Inbox transfers every held piece, one txn each
+                if (p.nftBundle > 0) it.put("nftBundle", 1);
                 items.put(it);
                 if (summary.length() > 0) summary.append(", ");
                 summary.append(p.name).append(" x").append(q);

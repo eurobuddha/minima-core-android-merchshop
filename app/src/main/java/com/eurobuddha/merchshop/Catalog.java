@@ -17,6 +17,11 @@ public final class Catalog {
     public final List<Shipping> shipping = new ArrayList<>();
     public final List<Product> products = new ArrayList<>();
 
+    /** Schema v3 collection directory: the standard top-side token icon + name + size per
+     *  referenced StateNFT collection, keyed by tokenid (icon = bare b64 JPEG or ""). */
+    public static class CollectionInfo { public String name = "", icon = ""; public int size = 0; }
+    public final java.util.Map<String, CollectionInfo> nftCollections = new java.util.LinkedHashMap<>();
+
     public static class Product {
         public String id, name, description = "", mode = "units", price = "0", image = "";
         public int maxUnits = 10;
@@ -29,9 +34,12 @@ public final class Catalog {
          *  piece), plus the collection's display name for grouping. */
         public int nftStateIdx = 0;
         public String nftCollection = "";
+        /** Schema v3.1 (complete collection): one product = every piece the seller holds. */
+        public int nftBundle = 0, nftPieces = 0;
 
         public boolean isNft() { return nftTokenId != null && !nftTokenId.isEmpty(); }
         public boolean isStatePiece() { return isNft() && nftStateIdx > 0; }
+        public boolean isBundle() { return isNft() && nftBundle > 0; }
     }
     public static class Shipping { public String id = "", label = "", fee = "0"; }
 
@@ -69,7 +77,20 @@ public final class Catalog {
                 x.nftExternalUrl = p.optString("nftExternalUrl", "");
                 x.nftStateIdx = p.optInt("nftStateIdx", 0);
                 x.nftCollection = p.optString("nftCollection", "");
+                x.nftBundle = p.optInt("nftBundle", 0);
+                x.nftPieces = p.optInt("nftPieces", 0);
                 c.products.add(x);
+            }
+            JSONArray cols = o.optJSONArray("nftCollections");
+            if (cols != null) for (int i = 0; i < cols.length(); i++) {
+                JSONObject co = cols.optJSONObject(i); if (co == null) continue;
+                String tid = co.optString("tokenid", "");
+                if (tid.isEmpty()) continue;
+                CollectionInfo ci = new CollectionInfo();
+                ci.name = co.optString("name", "");
+                ci.icon = co.optString("icon", "");
+                ci.size = co.optInt("size", 0);
+                c.nftCollections.put(tid, ci);
             }
         } catch (Exception ignored) { /* keep defaults */ }
         return c;
