@@ -57,7 +57,7 @@ import com.eurobuddha.comms.MerchMessage;
 import com.eurobuddha.comms.NodeApi;
 import com.eurobuddha.comms.Opened;
 import com.eurobuddha.comms.Sodium;
-import org.minimarex.minimaapi.MinimaAPIMessages;
+import com.eurobuddha.minimaapi.MinimaAPIMessages;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
