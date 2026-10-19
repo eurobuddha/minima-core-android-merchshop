@@ -362,7 +362,11 @@ public class MainActivity extends AppCompatActivity {
         io.execute(() -> {
             try (java.io.InputStream is = getContentResolver().openInputStream(uri)) {
                 java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
-                byte[] buf = new byte[8192]; int n; while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+                byte[] buf = new byte[8192]; int n;
+                while ((n = is.read(buf)) != -1) {
+                    if (bos.size() + n > 16 * 1024 * 1024) throw new java.io.IOException("Shop file is too large");
+                    bos.write(buf, 0, n);
+                }
                 String json = new String(bos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
                 final Catalog c = store.importBundle(json);
                 ui.post(() -> {

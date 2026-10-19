@@ -24,7 +24,7 @@ public final class ShopStore {
         Catalog c = Catalog.fromJson(json);
         if (!c.valid()) return null;
         String id = (c.shopId == null || c.shopId.isEmpty()) ? slug(c.shopName) : c.shopId;
-        try (FileWriter w = new FileWriter(new File(dir, id + ".json"))) { w.write(json); }
+        try (FileWriter w = new FileWriter(fileFor(id))) { w.write(json); }
         catch (Exception e) { return null; }
         return c;
     }
@@ -36,12 +36,28 @@ public final class ShopStore {
         return out;
     }
 
-    public Catalog get(String shopId) { return read(new File(dir, shopId + ".json")); }
+    public Catalog get(String shopId) {
+        try { return read(fileFor(shopId)); } catch (java.io.IOException invalid) { return null; }
+    }
 
-    public void delete(String shopId) { new File(dir, shopId + ".json").delete(); }
+    public void delete(String shopId) {
+        try { fileFor(shopId).delete(); } catch (java.io.IOException invalid) { /* Refuse escaped paths. */ }
+    }
+
+    /** Canonical containment reused from the host's NodeFiles.resolveInBase. */
+    private File fileFor(String id) throws java.io.IOException {
+        if (id == null || id.isEmpty() || id.indexOf('/') >= 0 || id.indexOf('\\') >= 0)
+            throw new java.io.IOException("Invalid shop identifier");
+        File target = new File(dir, id + ".json").getCanonicalFile();
+        if (!dir.getCanonicalFile().equals(target.getParentFile()))
+            throw new java.io.IOException("Shop path outside its folder");
+        return target;
+    }
 
     private Catalog read(File f) {
         try {
+            if (!dir.getCanonicalFile().equals(f.getCanonicalFile().getParentFile())
+                    || f.length() > 16 * 1024 * 1024) return null;
             byte[] b = new byte[(int) f.length()];
             try (FileInputStream in = new FileInputStream(f)) { int off = 0, r; while (off < b.length && (r = in.read(b, off, b.length - off)) > 0) off += r; }
             Catalog c = Catalog.fromJson(new String(b, StandardCharsets.UTF_8));

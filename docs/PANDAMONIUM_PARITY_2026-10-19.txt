@@ -33,3 +33,16 @@ SHA256: f1b89879a2ae73f8674e0ff34d5dd49a411f80f3a7c41125543ead25c3583556
 Package/version/family certificate verified. Approve this bounded refresh repair;
 payment journal, original-order recipient and storage ports are still pending.
 No install/publication; physical Fold validation pending.
+
+Import containment checkpoint: 0.4.7 / code 407
+Copies integrated ShopStore canonical-path validation with only its storage folder
+changed back to the standalone shops directory. Traversal and escaping symlinks
+cannot read, overwrite or delete other files. Reuses the 16MiB import/read cap.
+Full Catalog/identity validator, store, import/remove callers and tests inspected;
+changed files reviewed. Seven tests pass, including real disposable filesystem
+round-trip/traversal/symlink fixtures. Offline signed build and lint pass (0 errors,
+84 warnings). Existing shop storage is retained. Payment parity remains pending.
+Candidate: dist/minimall-shop-0.4.7-candidate.apk
+SHA256: 79866c4a5ca0497175c3d1a4086f42e57af5c6c2cde601bd5ea2147f42581f39
+Package/version/family signing certificate verified. Approve this bounded port.
+No install/publication; no real order, payment or external message.
