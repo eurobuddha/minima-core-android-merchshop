@@ -247,12 +247,14 @@ public class MainActivity extends AppCompatActivity {
     private void askForSeed() {
         final EditText in = input("Your Minima seed phrase");
         in.setMinLines(3);
-        new AlertDialog.Builder(this)
+        AlertDialog seedDialog = new AlertDialog.Builder(this)
                 .setTitle("Set up to shop")
                 .setMessage("A shopping key is derived from your Minima seed so the vendor can confirm your order and message you. Paste your seed once — it's used only to derive the key and is never stored.")
                 .setView(in)
                 .setPositiveButton("Continue", (d, w) -> { String s = in.getText().toString().trim(); if (!s.isEmpty()) deriveIdentity(s); })
-                .show();
+                .create();
+        seedDialog.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+        seedDialog.show();
     }
 
     // ---- scanning ----
@@ -526,7 +528,7 @@ public class MainActivity extends AppCompatActivity {
             ilp.setMargins(dp(6), dp(6), dp(6), dp(6));
             inner.setLayoutParams(ilp);
 
-            final ImageView art = new ImageView(MainActivity.this) {
+            final ImageView art = new androidx.appcompat.widget.AppCompatImageView(MainActivity.this) {
                 @Override protected void onMeasure(int w, int hh) { super.onMeasure(w, w); }   // square
             };
             art.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -1338,6 +1340,8 @@ public class MainActivity extends AppCompatActivity {
     }
     private TextView iconBtn(String glyph, Runnable onClick) {
         TextView b = new TextView(this); b.setText(glyph); b.setTextColor(Design.TEXT); b.setTextSize(20f);
+        b.setContentDescription("‹".equals(glyph) ? "Back" : "🧾".equals(glyph) ? "My orders" : "Message the vendor");
+        b.setMinWidth(dp(48)); b.setMinHeight(dp(48));
         b.setGravity(Gravity.CENTER); b.setPadding(dp(10), dp(2), dp(10), dp(2)); b.setOnClickListener(v -> onClick.run());
         return b;
     }
@@ -1365,8 +1369,9 @@ public class MainActivity extends AppCompatActivity {
     }
     private TextView roundBtn(String glyph) {
         TextView b = new TextView(this); b.setText(glyph); b.setTextColor(Design.TEXT); b.setTextSize(18f); b.setGravity(Gravity.CENTER);
+        b.setContentDescription("+".equals(glyph) ? "Increase quantity" : "Decrease quantity");
         b.setBackground(Design.roundBg(this, Design.SURFACE2, 8));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(38), dp(38)); lp.leftMargin = dp(4); lp.rightMargin = dp(4);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(48), dp(48)); lp.leftMargin = dp(4); lp.rightMargin = dp(4);
         b.setLayoutParams(lp); return b;
     }
     private EditText input(String hint) {

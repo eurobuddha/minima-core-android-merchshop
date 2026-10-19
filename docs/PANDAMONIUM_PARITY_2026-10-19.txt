@@ -1,0 +1,20 @@
+Standalone MiniMall Shop parity checkpoint: 0.4.5 / code 405
+
+Reuses presentation fixes from scripts/adapt-pandamonium-mall-shop-languages.py:
+48dp quantity controls and labelled header icons, clearer secondary text, and
+FLAG_SECURE on the existing seed-entry dialog. Standalone strings remain English;
+no host-only localization or transport dependencies were introduced.
+Reuses Studio's AppCompatImageView square override to fix pre-existing widget lint,
+and Mail/Studio's optional-camera declaration. Both integrated/standalone Shop now
+use the compatible image view. Square sizing, crop and bindings are unchanged.
+
+Review: changed helpers, callers, theme/manifest/dependency configuration inspected.
+Offline signed release build and lint pass (0 errors, 79 warnings). This repo had
+no JVM suite for these view helpers; no synthetic implementation-mirroring tests
+added. Physical layout/accessibility check remains pending on the Fold.
+Candidate: dist/minimall-shop-0.4.5-candidate.apk
+SHA256: f43ae48a4b5ac4472f9c7c2a3dfb609d3b4feb315708b10f9ba2502b24dac9b4
+Family signing certificate and package/version verified.
+Certificate SHA256: eca1383c9d27683a281fbe6355356267877dc2dd14d963d7cc289ca0700e517f
+Approve this bounded presentation port; full checkout/payment/order-context and
+storage parity remain open. No live send, installation or publication.
