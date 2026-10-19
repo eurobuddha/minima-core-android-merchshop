@@ -46,3 +46,17 @@ Candidate: dist/minimall-shop-0.4.7-candidate.apk
 SHA256: 79866c4a5ca0497175c3d1a4086f42e57af5c6c2cde601bd5ea2147f42581f39
 Package/version/family signing certificate verified. Approve this bounded port.
 No install/publication; no real order, payment or external message.
+
+Transport repair checkpoint: 0.4.8/code408
+Reuses scripts/adapt-pandamonium-malls.py payment argument checks and main-handler
+command dispatch with closed-connection rejection. Standalone MinimaAPI retained.
+Reuses PaymentArgumentsTest and NodeApiThreadingTest with package/client imports
+adapted. Valid amounts and order references remain unchanged; malformed command
+arguments cannot reach the node. No live transaction performed.
+Review: inspected complete transport/wrapper, callers and tests; compared final
+diffs against canonical blocks. No blocking finding in these bounded changes.
+Offline tests, signed build and lint passed: 11 tests; 0 lint errors, 84 warnings.
+Actual package/version/signature/ZIP integrity checked: dist/minimall-shop-0.4.8-candidate.apk
+SHA256: a65b40e489c6e3b73cef612c65182b6d6357b496ab1778837ee07d31e7d26274
+Receipt validation, durable sends/retry handling and full parity remain open.
+No installation or publication.
