@@ -198,6 +198,7 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onResult(JSONObject j) {
                 JSONObject r = j.optJSONObject("response");
                 if (r != null) { String a = r.optString("miniaddress", r.optString("address", "")); if (!a.isEmpty()) buyerPayaddr = a; }
+                refreshCheckoutIfTop();
             }
             @Override public void onError(String m) {}
         });
@@ -941,7 +942,7 @@ public class MainActivity extends AppCompatActivity {
 
     /** The buyer's own receiving address (delivery destination for NFTs), tap to copy. */
     private View buildWalletRow() {
-        LinearLayout row = new LinearLayout(this); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout row = new LinearLayout(this); row.setTag("checkoutWallet"); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
         row.setBackground(Design.roundBg(this, Design.SURFACE, 12)); row.setPadding(dp(14), dp(12), dp(14), dp(12));
         TextView a = new TextView(this);
         a.setText(buyerPayaddr.isEmpty() ? "Reading your wallet address…" : "◈ " + shortId(buyerPayaddr));
@@ -978,8 +979,16 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     private void refreshCheckoutIfTop() {
+        if (isFinishing() || isDestroyed()) return;
         View top = stack.peek();
-        if (top != null && "checkout".equals(top.getTag())) refreshTop(buildCheckout());
+        if (top == null || !"checkout".equals(top.getTag())) return;
+        // Studio's tagged-view update: keep the form, shipping choice and active Editable intact.
+        View wallet = top.findViewWithTag("checkoutWallet");
+        if (wallet == null || !(wallet.getParent() instanceof ViewGroup)) return;
+        ViewGroup parent = (ViewGroup) wallet.getParent();
+        int index = parent.indexOfChild(wallet);
+        View updated = buildWalletRow(); updated.setLayoutParams(wallet.getLayoutParams());
+        parent.removeViewAt(index); parent.addView(updated, index);
     }
 
     private void confirmAndPlace(final String shipId, final String delivery, final String note) {

@@ -18,3 +18,18 @@ Family signing certificate and package/version verified.
 Certificate SHA256: eca1383c9d27683a281fbe6355356267877dc2dd14d963d7cc289ca0700e517f
 Approve this bounded presentation port; full checkout/payment/order-context and
 storage parity remain open. No live send, installation or publication.
+
+Checkout refresh checkpoint: 0.4.6 / code 406
+Reuses adapt-pandamonium-shop-checkout.py's tagged wallet-row replacement. Address
+success/failure and pairing refresh now retain delivery/note Editables, IME
+composition, selection, focus, chosen shipping, totals and navigation context.
+Copied CheckoutRefreshTest, adapting comms imports and replacing host language
+switching with repeated standalone callbacks. Four tests pass with real Android
+views and a mocked node; no real purchase or onCreate/identity setup.
+Reviewed complete changed methods, UI/callback callers and adapted fixture.
+Offline signed build/lint pass (0 errors, 82 warnings).
+Candidate: dist/minimall-shop-0.4.6-candidate.apk
+SHA256: f1b89879a2ae73f8674e0ff34d5dd49a411f80f3a7c41125543ead25c3583556
+Package/version/family certificate verified. Approve this bounded refresh repair;
+payment journal, original-order recipient and storage ports are still pending.
+No install/publication; physical Fold validation pending.
