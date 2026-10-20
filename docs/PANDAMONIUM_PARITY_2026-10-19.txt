@@ -60,3 +60,22 @@ Actual package/version/signature/ZIP integrity checked: dist/minimall-shop-0.4.8
 SHA256: a65b40e489c6e3b73cef612c65182b6d6357b496ab1778837ee07d31e7d26274
 Receipt validation, durable sends/retry handling and full parity remain open.
 No installation or publication.
+
+2026-10-20 resumed parity — Shop0.4.9/code409
+Confirmed shared defect: home/storefront connection labels remained stale after
+identity completion, and an existing identity could hide a later disconnection.
+Reused adapt-pandamonium-shop-checkout.py::adapt_status and its two
+CheckoutRefreshTest regressions. Adaptations: standalone English and comms imports
+only. Existing IPC, wallet/address refresh, cart, shipping and exact Editables kept.
+Both new tests failed before repair;13 debug+13 release tests now pass.
+Offline assembleRelease/lintRelease pass;0 errors84 warnings.
+
+Code Review
+Summary: narrow label update at existing main-thread pairing/identity callbacks;
+updates retained pages without replacing navigation or checkout forms.
+Findings: no blocking findings in changed source, callers, tests and version.
+Verdict: Approve this bounded checkpoint; financial journal parity remains open.
+Signed package/version and family certificate verified; ZIP integrity passes.
+Candidate:dist/minimall-shop-0.4.9-candidate.apk
+SHA256:d3e8c129dca462ccead2a9d8d870c90d199a06a37aa51c662b4425c352740cc1
+No install, publication, real order, payment or external message.

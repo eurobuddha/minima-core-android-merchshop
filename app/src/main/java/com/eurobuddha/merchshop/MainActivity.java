@@ -183,8 +183,27 @@ public class MainActivity extends AppCompatActivity {
     private void refreshTop(View rebuilt) { stack.pop(); stack.push(rebuilt); showTop(); }
 
     // ---- pairing + identity ----
+    /** Same tagged-view refresh as checkout/Studio: never rebuild a cart or typed form. */
+    private TextView buildConnectionStatus() {
+        TextView status = new TextView(this); status.setTag("shopConnectionStatus");
+        status.setTextColor(Design.DIM); status.setTextSize(13f); status.setPadding(dp(16),dp(8),dp(16),dp(8));
+        updateConnectionStatus(status); return status;
+    }
+    private void updateConnectionStatus(TextView status) {
+        status.setText(paired ? "Connecting to your node…" : "Enable miniMall Shop in Minima Core → Apps to order.");
+        status.setVisibility(paired && crypto != null ? View.GONE : View.VISIBLE);
+    }
+    private void refreshConnectionStatus() {
+        if (isFinishing() || isDestroyed()) return;
+        for (View page : stack) {
+            TextView status = page.findViewWithTag("shopConnectionStatus");
+            if (status != null) updateConnectionStatus(status);
+        }
+    }
+
     private void onPaired(boolean enabled) {
         paired = enabled;
+        refreshConnectionStatus();
         pairingBanner.setVisibility(enabled ? View.GONE : View.VISIBLE);
         if (enabled) {
             if (chainBlock == 0) fetchBlock();
@@ -243,6 +262,7 @@ public class MainActivity extends AppCompatActivity {
         myId = id.publicId();
         scanner = new CommsScanner(node, crypto, db, CommsTransport.MINIMERCH_ADDRESS,
                 this::routeIncoming, (ok, n) -> onScanDone(n));
+        refreshConnectionStatus();
     }
 
     private void askForSeed() {
@@ -304,12 +324,7 @@ public class MainActivity extends AppCompatActivity {
         ver.setTextColor(Design.DIM2); ver.setTextSize(10f); ver.setPadding(dp(16), dp(2), dp(16), dp(4));
         col.addView(ver);
 
-        if (crypto == null) {
-            TextView s = new TextView(this);
-            s.setText(paired ? "Connecting to your node…" : "Enable miniMall Shop in Minima Core → Apps to order.");
-            s.setTextColor(Design.DIM); s.setTextSize(13f); s.setPadding(dp(16), dp(8), dp(16), dp(8));
-            col.addView(s);
-        }
+        col.addView(buildConnectionStatus());
 
         final List<Catalog> shops = store.all();
         if (shops.isEmpty()) {
@@ -411,12 +426,7 @@ public class MainActivity extends AppCompatActivity {
             col.addView(ver);
         }
 
-        if (crypto == null) {
-            TextView s = new TextView(this);
-            s.setText(paired ? "Connecting to your node…" : "Enable miniMall Shop in Minima Core → Apps to order.");
-            s.setTextColor(Design.DIM); s.setTextSize(13f); s.setPadding(dp(16), dp(8), dp(16), dp(8));
-            col.addView(s);
-        }
+        col.addView(buildConnectionStatus());
 
         RecyclerView rv = new RecyclerView(this);
         if (nftShop) {
