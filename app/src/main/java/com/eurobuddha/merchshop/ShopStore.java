@@ -20,10 +20,10 @@ public final class ShopStore {
     }
 
     /** Validate + save a bundle under its shopId; returns the parsed Catalog, or null if invalid
-     *  (including a currency whose token id is not its own: {@link Catalog#tokenProblem}). */
+     *  (including a currency whose token id is not its own, or a price that is not plain: {@link Catalog#problem}). */
     public Catalog importBundle(String json) {
         Catalog c = Catalog.fromJson(json);
-        if (!c.valid() || c.tokenProblem() != null) return null;
+        if (!c.valid() || c.problem() != null) return null;
         String id = (c.shopId == null || c.shopId.isEmpty()) ? slug(c.shopName) : c.shopId;
         try (FileWriter w = new FileWriter(fileFor(id))) { w.write(json); }
         catch (Exception e) { return null; }

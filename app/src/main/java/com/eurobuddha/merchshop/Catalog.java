@@ -112,6 +112,30 @@ public final class Catalog {
     /** The token this shop is paid in, from its CURRENCY alone (null when {@link #tokenProblem} is not null). */
     public String payTokenid() { return tokenProblem() == null ? MerchMessage.tokenFor(currency) : null; }
 
+    /** A price or fee as a plain decimal: digits with at most one point, no sign, exponent or spaces, at most 30
+     *  whole and 44 decimal places (Minima's limit). ".5" and "5." are kept: they read exactly as before. */
+    public static boolean plain(String v) {
+        return v != null && v.matches("\\d{1,30}(\\.\\d{0,44})?|\\.\\d{1,44}");
+    }
+
+    /** Why a price, fee or stock in this shop cannot be used, or null. Checked with {@link #tokenProblem} on import,
+     *  on open and before the "Pay …?" question; valid prices give exactly the totals they gave before. */
+    public String priceProblem() {
+        for (Product p : products) {
+            if (!plain(p.price)) return "The price of \"" + cut(p.name) + "\" is not a plain number (" + cut(p.price) + "). Nothing was sent.";
+            if (p.maxUnits < 1) return "The stock of \"" + cut(p.name) + "\" is not a whole number above zero. Nothing was sent.";
+        }
+        for (Shipping s : shipping)
+            if (!plain(s.fee == null || s.fee.isEmpty() ? "0" : s.fee)) return "The fee of the delivery method \"" + cut(s.label) + "\" is not a plain number (" + cut(s.fee) + "). Nothing was sent.";
+        return null;
+    }
+
+    /** The first problem this shop has (token, then prices), or null. */
+    public String problem() { String t = tokenProblem(); return t != null ? t : priceProblem(); }
+
+    /** A vendor-supplied name or price in a message (not an identifier): at most 60 characters. */
+    private static String cut(String s) { return s == null ? "" : s.length() <= 60 ? s : s.substring(0, 60) + "…"; }
+
     /** Kept for compatibility with the old single-shop call sites. */
     public boolean configured() { return valid(); }
 

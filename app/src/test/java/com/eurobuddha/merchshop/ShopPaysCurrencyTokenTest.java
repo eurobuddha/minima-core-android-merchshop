@@ -124,6 +124,26 @@ public class ShopPaysCurrencyTokenTest {
         assertFalse(all, all.contains("USDT"));
     }
 
+    @Test public void pricesAndFeesArePlainDecimals() throws Exception {
+        for (String ok : new String[]{"1", "1.5", "0012.340000", ".5", "5.", "0"}) assertTrue(ok, Catalog.plain(ok));
+        for (String bad : new String[]{"1e3", "+5", "-5", " 5", "5 ", "1,5", "", "0x10", "1.2.3", ".", "NaN", null}) assertFalse(String.valueOf(bad), Catalog.plain(bad));
+        assertNull(((ShopStore) get("store")).importBundle(shop("Minima", null).replace("\"price\":\"1.5\"", "\"price\":\"1e3\"")));
+        Catalog c = Catalog.fromJson(shop("USDT", null)); assertNull(c.problem());
+        c.products.get(0).price = "-1"; assertTrue(c.problem(), c.problem().startsWith("The price of \"One\" is not a plain number (-1)."));
+    }
+
+    @Test public void aNonPlainFeeOrAZeroTotalNeverReachesTheQuestion() throws Exception {
+        openCart(shop("Minima", null));
+        Catalog.Shipping s = new Catalog.Shipping(); s.id = "postal"; s.label = "Postal"; s.fee = "1E2";
+        ((Catalog) get("catalog")).shipping.add(s);
+        call("confirmAndPlace", new Class<?>[]{String.class, String.class, String.class}, "postal", "buyer@example.invalid", "");
+        assertTrue(lastDialogText(), lastDialogText().startsWith("The fee of the delivery method \"Postal\" is not a plain number (1E2)."));
+        openCart(shop("Minima", null)); ((Catalog) get("catalog")).products.get(0).price = "0";
+        call("confirmAndPlace", new Class<?>[]{String.class, String.class, String.class}, "digital", "buyer@example.invalid", "");
+        assertEquals("The total is zero. Nothing was sent.", lastDialogText());
+        verify(node, never()).cmd(anyString(), any());
+    }
+
     @Test public void theWalletRowShowsTheWholeAddress() throws Exception {
         String mine = "Mx" + "Z".repeat(58);
         set("buyerPayaddr", mine);

@@ -177,7 +177,7 @@ public class MainActivity extends AppCompatActivity {
     private void openShop(String shopId) {
         Catalog c = store.get(shopId);
         if (c == null) { toast("Couldn't open that shop."); return; }
-        String why = c.tokenProblem();
+        String why = c.problem();
         if (why != null) { refuse(why); return; }   // a shop stored before 0.4.13
         catalog = c; cart.clear();
         push(buildStorefront());
@@ -386,7 +386,7 @@ public class MainActivity extends AppCompatActivity {
                     bos.write(buf, 0, n);
                 }
                 String json = new String(bos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-                final String why = Catalog.fromJson(json).tokenProblem();
+                final String why = Catalog.fromJson(json).problem();
                 final Catalog c = why == null ? store.importBundle(json) : null;
                 ui.post(() -> {
                     if (why != null) refuse(why);
@@ -1012,8 +1012,9 @@ public class MainActivity extends AppCompatActivity {
 
     /** The "Pay …?" question names what is sent, in which token and to whom, each whole on its own line. */
     private void confirmAndPlace(final String shipId, final String delivery, final String note) {
-        final String why = catalog.tokenProblem();
+        final String why = catalog.problem();
         if (why != null) { refuse(why); return; }
+        if (grandTotal(shipId).signum() <= 0) { refuse("The total is zero. Nothing was sent."); return; }
         final String total = grandTotal(shipId).toPlainString(), token = catalog.payTokenid(), cur = MerchMessage.tokenName(token);
         new AlertDialog.Builder(this)
                 .setTitle("Pay " + total + " " + cur + "?")
@@ -1031,7 +1032,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void placeOrder(String shipId, String delivery, String note, String shownTotal) {
         final String payToken = catalog.payTokenid();   // the currency's token, never the file's own tokenid
-        if (payToken == null) { refuse(catalog.tokenProblem()); return; }
+        if (payToken == null || catalog.priceProblem() != null) { refuse(catalog.problem()); return; }
         final JSONArray items = new JSONArray();
         final StringBuilder summary = new StringBuilder();
         BigDecimal total = BigDecimal.ZERO;
