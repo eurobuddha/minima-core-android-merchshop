@@ -30,7 +30,7 @@ import static org.mockito.ArgumentMatchers.*;
 public class ShopPaysCurrencyTokenTest {
     static final String MXUSD = "0x7D39745FBD29049BE29850B55A18BF550E4D442F930F86266E34193D89042A90";
     static final String VENDOR = "0x" + "12".repeat(64), PAYOUT = "Mx" + "Q".repeat(58);
-    MainActivity activity; NodeApi node;
+    MainActivity activity; NodeApi node; MerchDb db;
 
     @Before public void setup() throws Exception {
         activity = Robolectric.buildActivity(MainActivity.class).get();
@@ -38,6 +38,7 @@ public class ShopPaysCurrencyTokenTest {
         activity.getWindow().setContentView(new FrameLayout(activity));
         node = mock(NodeApi.class); set("node", node);
         set("store", new ShopStore(activity));
+        db = new MerchDb(activity); set("db", db);
     }
     @After public void close() throws Exception {
         ((ExecutorService) get("io")).shutdownNow();
@@ -154,9 +155,49 @@ public class ShopPaysCurrencyTokenTest {
     @Test public void retryPaymentRefusesAnOrderWhoseTokenIsNotItsCurrencys() throws Exception {
         MerchDb.Order o = new MerchDb.Order();
         o.ref = "ORD-FIXTURE"; o.amount = "3.0"; o.currency = "Minima"; o.tokenid = MXUSD; o.shopId = "fixture";
+        db.setMeta("notsent:ORD-FIXTURE", "1"); db.setMeta("vendoraddr:ORD-FIXTURE", PAYOUT);
         call("retryPayment", new Class<?>[]{MerchDb.Order.class}, o);
         assertTrue(lastDialogText().contains(MXUSD));
         verify(node, never()).cmd(anyString(), any());
         assertEquals(MerchMessage.MXUSD_TOKEN, MXUSD);
+    }
+
+    MerchDb.Order unpaid(String ref) {
+        MerchDb.Order o = new MerchDb.Order(); o.ref = ref; o.amount = "3.0"; o.currency = "USDT"; o.tokenid = MXUSD; o.shopId = "fixture"; return o;
+    }
+
+    @Test public void retryIsRefusedWhenThePaymentMayHaveBeenSent() throws Exception {
+        db.setMeta("vendoraddr:ORD-MAYBE", PAYOUT); db.setMeta("unpaid:ORD-MAYBE", "1");   // the old flag could not tell
+        call("retryPayment", new Class<?>[]{MerchDb.Order.class}, unpaid("ORD-MAYBE"));
+        assertTrue(lastDialogText(), lastDialogText().startsWith("This payment may already have been sent."));
+        verify(node, never()).cmd(anyString(), any());
+    }
+
+    @Test public void retryUsesOnlyTheStoredAddressOfThisOrder() throws Exception {
+        openCart(shop("USDT", null));   // an open shop with an address must not be used
+        db.setMeta("notsent:ORD-NOADDR", "1");
+        call("retryPayment", new Class<?>[]{MerchDb.Order.class}, unpaid("ORD-NOADDR"));
+        assertTrue(lastDialogText(), lastDialogText().startsWith("This order has no stored payment address"));
+        verify(node, never()).cmd(anyString(), any());
+    }
+
+    @Test public void retryAsksTheWholeQuestionOnceAndAnUncertainFailureEndsRetries() throws Exception {
+        db.setMeta("notsent:ORD-RT", "1"); db.setMeta("vendoraddr:ORD-RT", PAYOUT);
+        call("retryPayment", new Class<?>[]{MerchDb.Order.class}, unpaid("ORD-RT"));
+        android.app.Dialog q = ShadowDialog.getLatestDialog();
+        String text = lastDialogText();
+        assertTrue(text, text.contains("\nAmount sent\n3.0\n") && text.contains("\nToken: MxUSD\n" + MXUSD + "\n") && text.endsWith("\nVendor's payment address\n" + PAYOUT));
+        call("retryPayment", new Class<?>[]{MerchDb.Order.class}, unpaid("ORD-RT"));   // a second tap
+        assertSame("no second question", q, ShadowDialog.getLatestDialog());
+        final List<NodeApi.Cb> pending = new ArrayList<>();
+        doAnswer(i -> { pending.add(i.getArgument(1)); return null; }).when(node).cmd(anyString(), any());
+        ((androidx.appcompat.app.AlertDialog) q).getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick();
+        ShadowLooper.idleMainLooper();
+        verify(node, times(1)).cmd(startsWith("send amount:3.0 address:" + PAYOUT + " tokenid:" + MXUSD), any());
+        pending.get(0).onError("timeout");   // the node did not answer: the payment may have been posted
+        ((ExecutorService) get("io")).shutdown(); ((ExecutorService) get("io")).awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
+        ShadowLooper.idleMainLooper();
+        assertEquals("1", db.getMeta("maybepaid:ORD-RT", ""));
+        assertEquals("", db.getMeta("notsent:ORD-RT", ""));
     }
 }

@@ -1078,47 +1078,73 @@ public class MainActivity extends AppCompatActivity {
             db.setMeta("vendoraddr:" + ref, catalog.vendorAddress);   // so Retry payment works without the live catalog
             CommsTransport.sendMessage(node, crypto, catalog.vendorPublicId, m.toWire(), new CommsTransport.SendCb() {
                 @Override public void onSent(String txid) {
+                    final boolean[] inCall = {true};
                     CommsTransport.sendPayment(node, catalog.vendorAddress, totalStr, payToken, ref, new CommsTransport.SendCb() {
                         @Override public void onSent(String ptx) {
                             ui.post(() -> { dismiss(progress); cart.clear(); pop(); toast("Order placed!"); showMyOrders(); });
                         }
                         @Override public void onFailed(String e) {
-                            db.setMeta("unpaid:" + ref, "1");   // flag so the order screen offers Retry payment
-                            ui.post(() -> { dismiss(progress); cart.clear(); pop(); toast("Order sent, but payment failed — open the order to retry."); showMyOrders(); });
+                            // Refused before anything reached the node = not sent (Retry is offered); any later failure
+                            // may have been posted, so Retry is NOT offered and the buyer is told to check their wallet.
+                            final boolean notSent = inCall[0];
+                            io.execute(() -> db.setMeta((notSent ? "notsent:" : "maybepaid:") + ref, "1"));
+                            ui.post(() -> { dismiss(progress); cart.clear(); pop();
+                                toast(notSent ? "Order sent, but the payment was not sent — open the order to retry." : "Order sent; the payment may or may not have gone — open the order."); showMyOrders(); });
                         }
                     });
+                    inCall[0] = false;
                 }
                 @Override public void onFailed(String e) { ui.post(() -> { dismiss(progress); toast("Order failed: " + e); }); }
             });
         });
     }
 
+    /** Retries in flight: a second tap while one is open or sending does nothing. */
+    private final java.util.Set<String> retrying = new java.util.HashSet<>();
+
+    /** Retry a payment that was refused before anything reached the node (notsent: meta) — only then. The
+     *  vendor address is the one stored with this order (vendoraddr: meta), never a re-opened or re-imported
+     *  shop; the same "Pay …?" question as checkout, whole; one retry at a time. */
     private void retryPayment(final MerchDb.Order o) {
+        if (!"1".equals(db.getMeta("notsent:" + o.ref, ""))) { refuse(MAYBE_PAID); return; }
         // An order placed before 0.4.13 may carry a token id that is not its currency's: refused, and the
         // payment always goes in the currency's token.
         final String why = MerchMessage.tokenProblem(o.currency, o.tokenid);
         if (why != null) { refuse(why); return; }
-        final String payToken = MerchMessage.tokenFor(o.currency);
-        // Resolve the vendor address WITHOUT the live catalog (null when reached from Home → My Orders):
-        // per-order meta first, then the stored shop, then the open catalog.
-        String vaddr = db.getMeta("vendoraddr:" + o.ref, "");
-        if (vaddr.isEmpty() && o.shopId != null && !o.shopId.isEmpty()) {
-            Catalog c = store.get(o.shopId);
-            if (c != null) vaddr = c.vendorAddress;
-        }
-        if (vaddr.isEmpty() && catalog != null) vaddr = catalog.vendorAddress;
-        if (vaddr.isEmpty()) { toast("Can't retry from here — open the shop and re-order."); return; }
+        final String payToken = MerchMessage.tokenFor(o.currency), cur = MerchMessage.tokenName(payToken);
+        final String vaddr = db.getMeta("vendoraddr:" + o.ref, "");
+        if (vaddr.isEmpty()) { refuse("This order has no stored payment address, so it cannot be paid from here. Nothing was sent."); return; }
+        if (!retrying.add(o.ref)) return;
+        new AlertDialog.Builder(this)
+                .setTitle("Pay " + o.amount + " " + cur + "?")
+                .setMessage("This pays order " + o.ref + ". Payment is final."
+                        + "\n\nAmount sent\n" + o.amount + "\n\nToken: " + cur + "\n" + payToken + "\n\nVendor's payment address\n" + vaddr)
+                .setPositiveButton("Pay", (d, w) -> sendRetry(o, vaddr, payToken))
+                .setNegativeButton("Back", (d, w) -> retrying.remove(o.ref))
+                .setOnCancelListener(d -> retrying.remove(o.ref))
+                .show();
+    }
+
+    private void sendRetry(final MerchDb.Order o, final String vaddr, final String payToken) {
         final AlertDialog progress = new AlertDialog.Builder(this)
-                .setTitle("Retrying payment").setMessage("Sending " + o.amount + " " + MerchMessage.tokenName(payToken) + "\n" + payToken + "\n\nto\n" + vaddr + "…").setCancelable(false).create();
+                .setTitle("Retrying payment").setMessage("Sending " + o.amount + " " + MerchMessage.tokenName(payToken)).setCancelable(false).create();
         progress.show();
+        final boolean[] inCall = {true};
         CommsTransport.sendPayment(node, vaddr, o.amount, payToken, o.ref, new CommsTransport.SendCb() {
             @Override public void onSent(String txid) {
-                io.execute(() -> db.setMeta("unpaid:" + o.ref, ""));
-                ui.post(() -> { dismiss(progress); toast("Payment sent."); refreshTop(buildOrderDetail(o.ref)); });
+                io.execute(() -> { db.setMeta("notsent:" + o.ref, "");
+                    ui.post(() -> { retrying.remove(o.ref); dismiss(progress); toast("Payment sent."); if (!stack.isEmpty()) refreshTop(buildOrderDetail(o.ref)); }); });
             }
-            @Override public void onFailed(String e) { ui.post(() -> { dismiss(progress); toast("Payment failed: " + e); }); }
+            @Override public void onFailed(String e) {
+                final boolean notSent = inCall[0];
+                io.execute(() -> { if (!notSent) { db.setMeta("notsent:" + o.ref, ""); db.setMeta("maybepaid:" + o.ref, "1"); }
+                    ui.post(() -> { retrying.remove(o.ref); dismiss(progress); refuse(notSent ? "The payment was not sent: " + e : MAYBE_PAID); if (!stack.isEmpty()) refreshTop(buildOrderDetail(o.ref)); }); });
+            }
         });
+        inCall[0] = false;
     }
+
+    static final String MAYBE_PAID = "This payment may already have been sent. Check your wallet's history for a payment with this order's reference before paying again: this app will not send it again. If it was not sent, place the order again.";
 
     // ---- my orders ----
     private void showMyOrders() { push(buildMyOrders()); }
@@ -1196,7 +1222,9 @@ public class MainActivity extends AppCompatActivity {
                     body.addView(copyRow("Delivered to", o.payaddr, o.payaddr));
                 if (!o.delivery.isEmpty()) body.addView(kv("To", o.delivery));   // mixed order: physical address
             }
-            if ("1".equals(db.getMeta("unpaid:" + o.ref, ""))) {
+            if ("1".equals(db.getMeta("maybepaid:" + o.ref, "")) || "1".equals(db.getMeta("unpaid:" + o.ref, ""))) {
+                body.addView(card(MAYBE_PAID));   // an "unpaid" flag from before 0.4.18 could not tell; it is treated the same way
+            } else if ("1".equals(db.getMeta("notsent:" + o.ref, ""))) {
                 TextView retry = button("Retry payment", true);
                 LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                 rlp.topMargin = dp(14); retry.setLayoutParams(rlp); retry.setPadding(dp(16), dp(12), dp(16), dp(12));
