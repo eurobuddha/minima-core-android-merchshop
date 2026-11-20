@@ -110,6 +110,13 @@ public class ShopPaysCurrencyTokenTest {
         verify(node, never()).cmd(anyString(), any());
     }
 
+    @Test public void theWalletRowShowsTheWholeAddress() throws Exception {
+        String mine = "Mx" + "Z".repeat(58);
+        set("buyerPayaddr", mine);
+        TextView first = (TextView) ((android.view.ViewGroup) call("buildWalletRow", new Class<?>[]{})).getChildAt(0);
+        assertEquals("◈ " + mine, first.getText().toString());
+    }
+
     @Test public void retryPaymentRefusesAnOrderWhoseTokenIsNotItsCurrencys() throws Exception {
         MerchDb.Order o = new MerchDb.Order();
         o.ref = "ORD-FIXTURE"; o.amount = "3.0"; o.currency = "Minima"; o.tokenid = MXUSD; o.shopId = "fixture";

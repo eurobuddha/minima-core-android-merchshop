@@ -758,7 +758,7 @@ public class MainActivity extends AppCompatActivity {
                 body.addView(kv("Edition", "#" + p.nftStateIdx + (p.nftSupply > 0 ? " of " + p.nftSupply : "")));
                 if (!p.nftCollection.isEmpty()) body.addView(kv("Collection", p.nftCollection));
             }
-            body.addView(copyRow("Token ID", shortId(p.nftTokenId), p.nftTokenId));
+            body.addView(copyRow("Token ID", p.nftTokenId, p.nftTokenId));
             if (p.nftSupply > 0) body.addView(kv("Supply", p.nftSupply + (p.nftTicker.isEmpty() ? "" : " · " + p.nftTicker)));
             else if (!p.nftTicker.isEmpty()) body.addView(kv("Ticker", p.nftTicker));
             final String ext = p.nftExternalUrl;
@@ -964,7 +964,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout row = new LinearLayout(this); row.setTag("checkoutWallet"); row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
         row.setBackground(Design.roundBg(this, Design.SURFACE, 12)); row.setPadding(dp(14), dp(12), dp(14), dp(12));
         TextView a = new TextView(this);
-        a.setText(buyerPayaddr.isEmpty() ? "Reading your wallet address…" : "◈ " + shortId(buyerPayaddr));
+        a.setText(buyerPayaddr.isEmpty() ? "Reading your wallet address…" : "◈ " + buyerPayaddr);
         a.setTextColor(buyerPayaddr.isEmpty() ? Design.DIM : Design.TEXT); a.setTextSize(14f); a.setTypeface(null, Typeface.BOLD);
         a.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         row.addView(a);
@@ -1189,10 +1189,10 @@ public class MainActivity extends AppCompatActivity {
                 if (!o.delivery.isEmpty()) body.addView(kv("To", o.delivery));
             } else {
                 for (String[] line : nfts) {
-                    body.addView(copyRow(line[0] + " ×" + line[2], "NFT · " + shortId(line[1]), line[1]));
+                    body.addView(copyRow(line[0] + " ×" + line[2], "NFT · " + line[1], line[1]));
                 }
                 if (o.payaddr != null && !o.payaddr.isEmpty())
-                    body.addView(copyRow("Delivered to", shortId(o.payaddr), o.payaddr));
+                    body.addView(copyRow("Delivered to", o.payaddr, o.payaddr));
                 if (!o.delivery.isEmpty()) body.addView(kv("To", o.delivery));   // mixed order: physical address
             }
             if ("1".equals(db.getMeta("unpaid:" + o.ref, ""))) {
@@ -1332,10 +1332,6 @@ public class MainActivity extends AppCompatActivity {
         return wrap;
     }
 
-    private static String shortId(String s) {
-        if (s == null || s.length() < 14) return s == null ? "" : s;
-        return s.substring(0, 8) + "…" + s.substring(s.length() - 4);
-    }
     private void copy(String s) {
         ((android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE))
                 .setPrimaryClip(android.content.ClipData.newPlainText("minimall", s));
