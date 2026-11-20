@@ -110,6 +110,20 @@ public class ShopPaysCurrencyTokenTest {
         verify(node, never()).cmd(anyString(), any());
     }
 
+    static List<String> texts(android.view.View v) {
+        List<String> out = new ArrayList<>();
+        if (v instanceof TextView) out.add(((TextView) v).getText().toString());
+        if (v instanceof android.view.ViewGroup) for (int i = 0; i < ((android.view.ViewGroup) v).getChildCount(); i++) out.addAll(texts(((android.view.ViewGroup) v).getChildAt(i)));
+        return out;
+    }
+
+    @Test public void anMxUsdShopReadsMxUsdNeverTheWireValue() throws Exception {
+        openCart(shop("USDT", null));
+        String all = String.join("\n", texts((android.view.View) call("buildCheckout", new Class<?>[]{})));
+        assertTrue(all, all.contains("3.0 MxUSD"));
+        assertFalse(all, all.contains("USDT"));
+    }
+
     @Test public void theWalletRowShowsTheWholeAddress() throws Exception {
         String mine = "Mx" + "Z".repeat(58);
         set("buyerPayaddr", mine);

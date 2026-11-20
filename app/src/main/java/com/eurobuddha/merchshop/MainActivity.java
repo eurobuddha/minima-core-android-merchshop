@@ -353,7 +353,7 @@ public class MainActivity extends AppCompatActivity {
                     name.setText(c.shopName); name.setTextColor(Design.TEXT); name.setTextSize(16f); name.setTypeface(null, Typeface.BOLD);
                     row.addView(name);
                     TextView sub = new TextView(MainActivity.this);
-                    sub.setText(c.products.size() + " product" + (c.products.size() == 1 ? "" : "s") + "  ·  " + c.currency);
+                    sub.setText(c.products.size() + " product" + (c.products.size() == 1 ? "" : "s") + "  ·  " + MerchMessage.label(c.currency));
                     sub.setTextColor(Design.DIM); sub.setTextSize(12f); sub.setPadding(0, dp(3), 0, 0);
                     row.addView(sub);
                     row.setOnClickListener(v -> openShop(shopKey(c)));
@@ -414,7 +414,7 @@ public class MainActivity extends AppCompatActivity {
         if (nftShop) {
             // collection header, marketplace-style
             TextView sub = new TextView(this);
-            sub.setText("NFT SHOP · PAYS IN " + catalog.currency.toUpperCase());
+            sub.setText("NFT SHOP · PAYS IN " + MerchMessage.label(catalog.currency));
             sub.setTextColor(Design.ACCENT); sub.setTextSize(11f); sub.setTypeface(null, Typeface.BOLD);
             sub.setPadding(dp(16), dp(4), dp(16), 0);
             col.addView(sub);
@@ -426,7 +426,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             TextView ver = new TextView(this);
-            ver.setText("Pays in " + catalog.currency);
+            ver.setText("Pays in " + MerchMessage.label(catalog.currency));
             ver.setTextColor(Design.DIM2); ver.setTextSize(11f); ver.setPadding(dp(16), dp(2), dp(16), dp(6));
             col.addView(ver);
         }
@@ -579,7 +579,7 @@ public class MainActivity extends AppCompatActivity {
             inner.addView(ed);
 
             TextView pr = new TextView(MainActivity.this);
-            pr.setText(p.price + " " + catalog.currency);
+            pr.setText(p.price + " " + MerchMessage.label(catalog.currency));
             pr.setTextColor(Design.ACCENT); pr.setTextSize(13f); pr.setTypeface(null, Typeface.BOLD);
             pr.setPadding(dp(4), dp(2), dp(4), 0);
             inner.addView(pr);
@@ -614,7 +614,7 @@ public class MainActivity extends AppCompatActivity {
         cartBarRef.removeAllViews();
         int count = cartCount();
         TextView info = new TextView(this);
-        info.setText(count == 0 ? "Cart empty" : count + " item" + (count == 1 ? "" : "s") + "  ·  " + cartTotal().toPlainString() + " " + catalog.currency);
+        info.setText(count == 0 ? "Cart empty" : count + " item" + (count == 1 ? "" : "s") + "  ·  " + cartTotal().toPlainString() + " " + MerchMessage.label(catalog.currency));
         info.setTextColor(Design.TEXT); info.setTextSize(14f);
         cartBarRef.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView checkout = button("Checkout", count > 0);
@@ -659,7 +659,7 @@ public class MainActivity extends AppCompatActivity {
             LinearLayout ctl = new LinearLayout(MainActivity.this); ctl.setOrientation(LinearLayout.HORIZONTAL);
             ctl.setGravity(Gravity.CENTER_VERTICAL); ctl.setPadding(0, dp(8), 0, 0);
             TextView price = new TextView(MainActivity.this);
-            price.setText(p.price + " " + catalog.currency); price.setTextColor(Design.ACCENT); price.setTextSize(15f); price.setTypeface(null, Typeface.BOLD);
+            price.setText(p.price + " " + MerchMessage.label(catalog.currency)); price.setTextColor(Design.ACCENT); price.setTextSize(15f); price.setTypeface(null, Typeface.BOLD);
             ctl.addView(price, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             ctl.addView(stepper(p));
             content.addView(ctl);
@@ -722,7 +722,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout pr = new LinearLayout(this); pr.setOrientation(LinearLayout.HORIZONTAL); pr.setGravity(Gravity.CENTER_VERTICAL);
         pr.setPadding(0, dp(14), 0, dp(8));
         TextView price = new TextView(this);
-        price.setText(p.price + " " + catalog.currency); price.setTextColor(Design.ACCENT); price.setTextSize(20f);
+        price.setText(p.price + " " + MerchMessage.label(catalog.currency)); price.setTextColor(Design.ACCENT); price.setTextSize(20f);
         price.setTypeface(null, Typeface.BOLD);
         pr.addView(price, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         if (p.isNft()) {
@@ -780,7 +780,7 @@ public class MainActivity extends AppCompatActivity {
             body.addView(stepper(p));
         }
 
-        TextView checkout = button(p.isNft() ? "Buy · " + p.price + " " + catalog.currency : "Go to checkout", true);
+        TextView checkout = button(p.isNft() ? "Buy · " + p.price + " " + MerchMessage.label(catalog.currency) : "Go to checkout", true);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         alp.topMargin = dp(20); checkout.setLayoutParams(alp); checkout.setPadding(dp(16), dp(13), dp(16), dp(13));
         checkout.setOnClickListener(v -> {
@@ -886,7 +886,7 @@ public class MainActivity extends AppCompatActivity {
             n.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             li.addView(n);
             TextView a = new TextView(this);
-            try { a.setText(new BigDecimal(p.price).multiply(BigDecimal.valueOf(q)).toPlainString() + " " + catalog.currency); } catch (Exception e) { a.setText(""); }
+            try { a.setText(new BigDecimal(p.price).multiply(BigDecimal.valueOf(q)).toPlainString() + " " + MerchMessage.label(catalog.currency)); } catch (Exception e) { a.setText(""); }
             a.setTextColor(Design.DIM); a.setTextSize(14f);
             li.addView(a);
             body.addView(li);
@@ -900,9 +900,9 @@ public class MainActivity extends AppCompatActivity {
         final Runnable updateTotal = () -> {
             BigDecimal items = cartTotal(), ship = shippingFee(chosenShipping), grand = items.add(ship);
             tot.setText((ship.signum() > 0
-                    ? "Items   " + items.toPlainString() + " " + catalog.currency + "\nShipping   " + ship.toPlainString() + " " + catalog.currency + "\n" : "")
-                    + "Total   " + grand.toPlainString() + " " + catalog.currency);
-            pay.setText("Pay " + grand.toPlainString() + " " + catalog.currency);
+                    ? "Items   " + items.toPlainString() + " " + MerchMessage.label(catalog.currency) + "\nShipping   " + ship.toPlainString() + " " + MerchMessage.label(catalog.currency) + "\n" : "")
+                    + "Total   " + grand.toPlainString() + " " + MerchMessage.label(catalog.currency));
+            pay.setText("Pay " + grand.toPlainString() + " " + MerchMessage.label(catalog.currency));
         };
         if (shippingPickerNeeded(nftOnly)) {
             body.addView(sectionLabel("Delivery method"));
@@ -1154,7 +1154,7 @@ public class MainActivity extends AppCompatActivity {
             top.addView(Design.pill(MainActivity.this, o.status, statusColor(o.status), Design.ON_ACCENT));
             row.addView(top);
             TextView sub = new TextView(MainActivity.this);
-            sub.setText(o.amount + " " + o.currency + "  ·  " + timeAgo(o.date));
+            sub.setText(o.amount + " " + MerchMessage.label(o.currency) + "  ·  " + timeAgo(o.date));
             sub.setTextColor(Design.DIM); sub.setTextSize(12f); sub.setPadding(0, dp(3), 0, 0);
             row.addView(sub);
             row.setOnClickListener(v -> push(buildOrderDetail(o.ref)));
@@ -1182,7 +1182,7 @@ public class MainActivity extends AppCompatActivity {
         if (!inquiry) {
             body.addView(sectionLabel("Order"));
             body.addView(card(o.product.isEmpty() ? o.ref : o.product));
-            body.addView(kv("Total", o.amount + " " + o.currency));
+            body.addView(kv("Total", o.amount + " " + MerchMessage.label(o.currency)));
             body.addView(kv("Reference", o.ref));
             if (nfts.isEmpty()) {
                 body.addView(kv("Delivery", o.shipping));
