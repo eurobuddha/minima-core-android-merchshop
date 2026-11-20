@@ -3,6 +3,7 @@ package com.eurobuddha.merchshop;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import com.eurobuddha.comms.CommsIdentity;
+import com.eurobuddha.comms.MerchMessage;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +11,8 @@ import java.util.List;
 /** A shop catalog + vendor card, loaded from an imported `.shop` bundle (JSON). */
 public final class Catalog {
 
-    public String shopName = "Shop", shopId = "", vendorPublicId = "", vendorAddress = "", currency = "Minima", tokenid = "0x00";
+    /** {@code tokenid} is the file's own, "" when it has none: it never decides what is paid (see {@link #payTokenid}). */
+    public String shopName = "Shop", shopId = "", vendorPublicId = "", vendorAddress = "", currency = "Minima", tokenid = "";
     /** Schema v2 (miniMerch NFT Studio): version marker, declared shop kind, storefront blurb. */
     public int schema = 1;
     public String shopType = "", about = "";
@@ -53,7 +55,7 @@ public final class Catalog {
             c.vendorPublicId = o.optString("vendorPublicId", "");
             c.vendorAddress = o.optString("vendorAddress", "");
             c.currency = o.optString("currency", "Minima");
-            c.tokenid = o.optString("tokenid", "0x00");
+            c.tokenid = o.optString("tokenid", "");
             c.schema = o.optInt("schema", 1);
             c.shopType = o.optString("shopType", "");
             c.about = o.optString("about", "");
@@ -101,6 +103,14 @@ public final class Catalog {
         return vendorPublicId != null && !vendorPublicId.contains("PLACEHOLDER")
                 && CommsIdentity.isValidPublicId(vendorPublicId) && !products.isEmpty();
     }
+
+    /** Why this shop cannot be paid, or null. A .shop file is the vendor's: one that says "Minima" and carries the
+     *  MxUSD token id (or any token id that is not its currency's) would have the buyer pay that token under the
+     *  Minima label, so it is refused on import, on open, before the "Pay …?" question and before the order is sent. */
+    public String tokenProblem() { return MerchMessage.tokenProblem(currency, tokenid); }
+
+    /** The token this shop is paid in, from its CURRENCY alone (null when {@link #tokenProblem} is not null). */
+    public String payTokenid() { return tokenProblem() == null ? MerchMessage.tokenFor(currency) : null; }
 
     /** Kept for compatibility with the old single-shop call sites. */
     public boolean configured() { return valid(); }

@@ -177,6 +177,8 @@ public class MainActivity extends AppCompatActivity {
     private void openShop(String shopId) {
         Catalog c = store.get(shopId);
         if (c == null) { toast("Couldn't open that shop."); return; }
+        String why = c.tokenProblem();
+        if (why != null) { refuse(why); return; }   // a shop stored before 0.4.13
         catalog = c; cart.clear();
         push(buildStorefront());
     }
@@ -384,9 +386,11 @@ public class MainActivity extends AppCompatActivity {
                     bos.write(buf, 0, n);
                 }
                 String json = new String(bos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-                final Catalog c = store.importBundle(json);
+                final String why = Catalog.fromJson(json).tokenProblem();
+                final Catalog c = why == null ? store.importBundle(json) : null;
                 ui.post(() -> {
-                    if (c == null) toast("That doesn't look like a valid .shop file.");
+                    if (why != null) refuse(why);
+                    else if (c == null) toast("That doesn't look like a valid .shop file.");
                     else { toast("Added " + c.shopName); showHome(); }
                 });
             } catch (Exception e) { ui.post(() -> toast("Couldn't read that file.")); }
@@ -1006,16 +1010,28 @@ public class MainActivity extends AppCompatActivity {
         parent.removeViewAt(index); parent.addView(updated, index);
     }
 
+    /** The "Pay …?" question names what is sent, in which token and to whom, each whole on its own line. */
     private void confirmAndPlace(final String shipId, final String delivery, final String note) {
-        final String total = grandTotal(shipId).toPlainString();
+        final String why = catalog.tokenProblem();
+        if (why != null) { refuse(why); return; }
+        final String total = grandTotal(shipId).toPlainString(), token = catalog.payTokenid(), cur = MerchMessage.tokenName(token);
         new AlertDialog.Builder(this)
-                .setTitle("Pay " + total + " " + catalog.currency + "?")
-                .setMessage("This sends your encrypted order to " + catalog.shopName + " and pays " + total + " " + catalog.currency + ". Payment is final.")
-                .setPositiveButton("Pay", (d, w) -> placeOrder(shipId, delivery, note))
+                .setTitle("Pay " + total + " " + cur + "?")
+                .setMessage("This sends your encrypted order to " + catalog.shopName + " and pays " + total + " " + cur + ". Payment is final."
+                        + "\n\nAmount sent\n" + total + "\n\nToken: " + cur + "\n" + token
+                        + "\n\nVendor's payment address\n" + catalog.vendorAddress)
+                .setPositiveButton("Pay", (d, w) -> placeOrder(shipId, delivery, note, total))
                 .setNegativeButton("Back", null).show();
     }
 
-    private void placeOrder(String shipId, String delivery, String note) {
+    /** A refusal carries a whole token id: a dialog the buyer can read, not a toast. */
+    private void refuse(String why) {
+        new AlertDialog.Builder(this).setTitle("Not paid").setMessage(why).setPositiveButton("OK", null).show();
+    }
+
+    private void placeOrder(String shipId, String delivery, String note, String shownTotal) {
+        final String payToken = catalog.payTokenid();   // the currency's token, never the file's own tokenid
+        if (payToken == null) { refuse(catalog.tokenProblem()); return; }
         final JSONArray items = new JSONArray();
         final StringBuilder summary = new StringBuilder();
         BigDecimal total = BigDecimal.ZERO;
@@ -1043,11 +1059,12 @@ public class MainActivity extends AppCompatActivity {
 
         final String ref = "ORD-" + MailText.randomId().substring(0, 8).toUpperCase();
         final String totalStr = total.toPlainString();
+        if (!totalStr.equals(shownTotal)) { refuse("The total changed after the question (" + shownTotal + " shown, " + totalStr + " now). Nothing was sent."); return; }
         final MerchMessage m = new MerchMessage();
         m.type = MerchMessage.ORDER; m.ref = ref; m.randomid = MailText.randomId();
         m.from = myId; m.to = catalog.vendorPublicId; m.date = System.currentTimeMillis();
         m.items = items.toString(); m.product = summary.toString();
-        m.amount = totalStr; m.currency = catalog.currency; m.tokenid = catalog.tokenid;
+        m.amount = totalStr; m.currency = catalog.currency; m.tokenid = payToken;
         m.shipping = shipId; m.delivery = delivery; m.message = note; m.buyerPayaddr = buyerPayaddr;
         m.shopId = catalog.shopId; m.shopName = catalog.shopName;
 
@@ -1060,7 +1077,7 @@ public class MainActivity extends AppCompatActivity {
             db.setMeta("vendoraddr:" + ref, catalog.vendorAddress);   // so Retry payment works without the live catalog
             CommsTransport.sendMessage(node, crypto, catalog.vendorPublicId, m.toWire(), new CommsTransport.SendCb() {
                 @Override public void onSent(String txid) {
-                    CommsTransport.sendPayment(node, catalog.vendorAddress, totalStr, catalog.tokenid, ref, new CommsTransport.SendCb() {
+                    CommsTransport.sendPayment(node, catalog.vendorAddress, totalStr, payToken, ref, new CommsTransport.SendCb() {
                         @Override public void onSent(String ptx) {
                             ui.post(() -> { dismiss(progress); cart.clear(); pop(); toast("Order placed!"); showMyOrders(); });
                         }
@@ -1076,6 +1093,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void retryPayment(final MerchDb.Order o) {
+        // An order placed before 0.4.13 may carry a token id that is not its currency's: refused, and the
+        // payment always goes in the currency's token.
+        final String why = MerchMessage.tokenProblem(o.currency, o.tokenid);
+        if (why != null) { refuse(why); return; }
+        final String payToken = MerchMessage.tokenFor(o.currency);
         // Resolve the vendor address WITHOUT the live catalog (null when reached from Home → My Orders):
         // per-order meta first, then the stored shop, then the open catalog.
         String vaddr = db.getMeta("vendoraddr:" + o.ref, "");
@@ -1086,9 +1108,9 @@ public class MainActivity extends AppCompatActivity {
         if (vaddr.isEmpty() && catalog != null) vaddr = catalog.vendorAddress;
         if (vaddr.isEmpty()) { toast("Can't retry from here — open the shop and re-order."); return; }
         final AlertDialog progress = new AlertDialog.Builder(this)
-                .setTitle("Retrying payment").setMessage("Sending " + o.amount + " " + o.currency + "…").setCancelable(false).create();
+                .setTitle("Retrying payment").setMessage("Sending " + o.amount + " " + MerchMessage.tokenName(payToken) + "\n" + payToken + "\n\nto\n" + vaddr + "…").setCancelable(false).create();
         progress.show();
-        CommsTransport.sendPayment(node, vaddr, o.amount, o.tokenid, o.ref, new CommsTransport.SendCb() {
+        CommsTransport.sendPayment(node, vaddr, o.amount, payToken, o.ref, new CommsTransport.SendCb() {
             @Override public void onSent(String txid) {
                 io.execute(() -> db.setMeta("unpaid:" + o.ref, ""));
                 ui.post(() -> { dismiss(progress); toast("Payment sent."); refreshTop(buildOrderDetail(o.ref)); });
@@ -1152,7 +1174,7 @@ public class MainActivity extends AppCompatActivity {
 
         final boolean inquiry = MerchDb.INQUIRY.equals(o.status) || o.ref.startsWith("INQ-");
         final List<String[]> nfts = inquiry ? new ArrayList<>() : nftLines(o);
-        final boolean badStatus = MerchDb.UNDERPAID.equals(o.status) || MerchDb.WRONG_TOKEN.equals(o.status);
+        final boolean badStatus = MerchDb.UNDERPAID.equals(o.status) || MerchDb.WRONG_TOKEN.equals(o.status) || MerchDb.TOKEN_MISMATCH.equals(o.status);
 
         if (!nfts.isEmpty() && !badStatus) body.addView(buildTimeline(o.status));   // Placed → Paid → Delivered
         else body.addView(Design.pill(this, inquiry ? "ENQUIRY" : o.status, statusColor(o.status), Design.ON_ACCENT));
@@ -1227,7 +1249,7 @@ public class MainActivity extends AppCompatActivity {
                 seed.type = MerchMessage.INQUIRY; seed.ref = ref;
                 seed.from = myId; seed.to = catalog.vendorPublicId; seed.date = System.currentTimeMillis();
                 seed.product = "Messages with " + catalog.shopName;
-                seed.currency = catalog.currency; seed.tokenid = catalog.tokenid; seed.buyerPayaddr = buyerPayaddr;
+                seed.currency = catalog.currency; seed.tokenid = catalog.payTokenid() == null ? "" : catalog.payTokenid(); seed.buyerPayaddr = buyerPayaddr;
                 seed.shopId = catalog.shopId; seed.shopName = catalog.shopName;
                 db.upsertOrder(seed, "buyer", "");   // local-only until the first message is sent
             }
@@ -1335,7 +1357,7 @@ public class MainActivity extends AppCompatActivity {
     private int statusColor(String s) {
         if (MerchDb.DELIVERED.equals(s) || MerchDb.SHIPPED.equals(s)) return Design.IN;
         if (MerchDb.PAID.equals(s) || MerchDb.CONFIRMED.equals(s)) return Design.ACCENT;
-        if (MerchDb.UNDERPAID.equals(s) || MerchDb.WRONG_TOKEN.equals(s)) return Design.RED;
+        if (MerchDb.UNDERPAID.equals(s) || MerchDb.WRONG_TOKEN.equals(s) || MerchDb.TOKEN_MISMATCH.equals(s)) return Design.RED;
         return Design.DIM2;
     }
     private static String timeAgo(long ms) {
