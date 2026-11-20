@@ -44,6 +44,14 @@ public final class CommsTransport {
     /** Send a real value PAYMENT to a vendor address; stamp the order ref into state[1] for matching. */
     public static void sendPayment(NodeApi node, String vendorAddress, String amount, String tokenid,
                                    String ref, SendCb cb) {
+        sendPayment(node, vendorAddress, amount, tokenid, ref, "", cb);
+    }
+
+    /** As above, and state port 2 = {@code commitment} (MerchMessage.commitment of the order's secret) when given:
+     *  the Inbox counts a payment for an order with a secret only when this matches (security review H1). */
+    public static void sendPayment(NodeApi node, String vendorAddress, String amount, String tokenid,
+                                   String ref, String commitment, SendCb cb) {
+        if (commitment != null && !commitment.isEmpty() && !commitment.matches("^0x[0-9a-fA-F]{64}$")) { cb.onFailed("Invalid payment address, token or amount."); return; }
         if (vendorAddress == null || !(vendorAddress.matches("^0x[0-9a-fA-F]{2,}$")
                 || vendorAddress.matches("^M[xX][0-9A-Za-z]{30,100}$"))
                 || tokenid == null || !tokenid.matches("^0x[0-9a-fA-F]{2,}$")
@@ -54,6 +62,7 @@ public final class CommsTransport {
         try {
             JSONObject extra = new JSONObject();
             if (ref != null && !ref.isEmpty()) extra.put("1", "0x" + Hex.to(ref.getBytes(StandardCharsets.UTF_8)));
+            if (commitment != null && !commitment.isEmpty()) extra.put("2", commitment);
             String cmd = "send amount:" + amount + " address:" + vendorAddress + " tokenid:" + tokenid
                     + (extra.length() > 0 ? " state:" + extra : "");
             post(node, cmd, cb);
