@@ -1079,15 +1079,17 @@ public class MainActivity extends AppCompatActivity {
             CommsTransport.sendMessage(node, crypto, catalog.vendorPublicId, m.toWire(), new CommsTransport.SendCb() {
                 @Override public void onSent(String txid) {
                     final boolean[] inCall = {true};
+                    db.setMeta("maybepaid:" + ref, "1");   // before the send: a screen that dies meanwhile never offers Retry (L1)
                     CommsTransport.sendPayment(node, catalog.vendorAddress, totalStr, payToken, ref, new CommsTransport.SendCb() {
                         @Override public void onSent(String ptx) {
+                            io.execute(() -> db.setMeta("maybepaid:" + ref, ""));
                             ui.post(() -> { dismiss(progress); cart.clear(); pop(); toast("Order placed!"); showMyOrders(); });
                         }
                         @Override public void onFailed(String e) {
                             // Refused before anything reached the node = not sent (Retry is offered); any later failure
                             // may have been posted, so Retry is NOT offered and the buyer is told to check their wallet.
                             final boolean notSent = inCall[0];
-                            io.execute(() -> db.setMeta((notSent ? "notsent:" : "maybepaid:") + ref, "1"));
+                            if (notSent) { db.setMeta("maybepaid:" + ref, ""); db.setMeta("notsent:" + ref, "1"); }
                             ui.post(() -> { dismiss(progress); cart.clear(); pop();
                                 toast(notSent ? "Order sent, but the payment was not sent — open the order to retry." : "Order sent; the payment may or may not have gone — open the order."); showMyOrders(); });
                         }
@@ -1130,15 +1132,18 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("Retrying payment").setMessage("Sending " + o.amount + " " + MerchMessage.tokenName(payToken)).setCancelable(false).create();
         progress.show();
         final boolean[] inCall = {true};
+        // Written BEFORE the send (review L1): if this screen dies while the node answers, the order already
+        // says the payment may have gone, and Retry is never offered again.
+        db.setMeta("notsent:" + o.ref, ""); db.setMeta("maybepaid:" + o.ref, "1");
         CommsTransport.sendPayment(node, vaddr, o.amount, payToken, o.ref, new CommsTransport.SendCb() {
             @Override public void onSent(String txid) {
-                io.execute(() -> { db.setMeta("notsent:" + o.ref, "");
+                io.execute(() -> { db.setMeta("maybepaid:" + o.ref, "");
                     ui.post(() -> { retrying.remove(o.ref); dismiss(progress); toast("Payment sent."); if (!stack.isEmpty()) refreshTop(buildOrderDetail(o.ref)); }); });
             }
             @Override public void onFailed(String e) {
-                final boolean notSent = inCall[0];
-                io.execute(() -> { if (!notSent) { db.setMeta("notsent:" + o.ref, ""); db.setMeta("maybepaid:" + o.ref, "1"); }
-                    ui.post(() -> { retrying.remove(o.ref); dismiss(progress); refuse(notSent ? "The payment was not sent: " + e : MAYBE_PAID); if (!stack.isEmpty()) refreshTop(buildOrderDetail(o.ref)); }); });
+                final boolean notSent = inCall[0];   // refused before it reached the node: certainly not sent
+                if (notSent) { db.setMeta("maybepaid:" + o.ref, ""); db.setMeta("notsent:" + o.ref, "1"); }
+                ui.post(() -> { retrying.remove(o.ref); dismiss(progress); refuse(notSent ? "The payment was not sent: " + e : MAYBE_PAID); if (!stack.isEmpty()) refreshTop(buildOrderDetail(o.ref)); });
             }
         });
         inCall[0] = false;

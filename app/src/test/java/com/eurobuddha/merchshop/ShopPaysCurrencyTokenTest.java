@@ -194,10 +194,29 @@ public class ShopPaysCurrencyTokenTest {
         ((androidx.appcompat.app.AlertDialog) q).getButton(android.content.DialogInterface.BUTTON_POSITIVE).performClick();
         ShadowLooper.idleMainLooper();
         verify(node, times(1)).cmd(startsWith("send amount:3.0 address:" + PAYOUT + " tokenid:" + MXUSD), any());
+        assertEquals("written before the send (L1)", "1", db.getMeta("maybepaid:ORD-RT", ""));
+        assertEquals("", db.getMeta("notsent:ORD-RT", ""));
         pending.get(0).onError("timeout");   // the node did not answer: the payment may have been posted
         ((ExecutorService) get("io")).shutdown(); ((ExecutorService) get("io")).awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
         ShadowLooper.idleMainLooper();
         assertEquals("1", db.getMeta("maybepaid:ORD-RT", ""));
         assertEquals("", db.getMeta("notsent:ORD-RT", ""));
+    }
+
+    @Test public void aRetryRefusedBeforeItReachedTheNodeCanBeRetriedAndASentOneClearsTheWarning() throws Exception {
+        db.setMeta("notsent:ORD-SYNC", "1"); db.setMeta("vendoraddr:ORD-SYNC", "not an address");
+        call("sendRetry", new Class<?>[]{MerchDb.Order.class, String.class, String.class}, unpaid("ORD-SYNC"), "not an address", MXUSD);
+        ShadowLooper.idleMainLooper();
+        assertEquals("1", db.getMeta("notsent:ORD-SYNC", ""));
+        assertEquals("", db.getMeta("maybepaid:ORD-SYNC", ""));
+        verify(node, never()).cmd(anyString(), any());
+        doAnswer(i -> { ((NodeApi.Cb) i.getArgument(1)).onResult(new JSONObject().put("status", true).put("response", new JSONObject().put("txpowid", "0x01"))); return null; })
+                .when(node).cmd(anyString(), any());
+        db.setMeta("vendoraddr:ORD-SENT", PAYOUT);
+        call("sendRetry", new Class<?>[]{MerchDb.Order.class, String.class, String.class}, unpaid("ORD-SENT"), PAYOUT, MXUSD);
+        ((ExecutorService) get("io")).shutdown(); ((ExecutorService) get("io")).awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
+        ShadowLooper.idleMainLooper();
+        assertEquals("", db.getMeta("maybepaid:ORD-SENT", ""));
+        assertEquals("", db.getMeta("notsent:ORD-SENT", ""));
     }
 }
